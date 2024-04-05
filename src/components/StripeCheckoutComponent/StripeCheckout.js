@@ -2,77 +2,80 @@ import React from 'react';
 import { Button } from "@mui/material"
 import { CardElement, useElements, useStripe } from "@stripe/react-stripe-js"
 import * as PaymentIntetnService from '../../services/PaymentIntentService'
+import axios from "axios"
 
 const StripeCheckoutForm = ({ cart, handleClose, setSnackSuccessOpen, setSnackFailedOpen }) => {
-    const stripe = useStripe()
-    const elements = useElements()
+  const stripe = useStripe()
+  const elements = useElements()
 
-    const handleSubmit = (event) => {
-        event.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
-        const cardElement = elements.getElement(CardElement)
-        PaymentIntetnService.createPaymentIntent(cart, "usd").then(res => {
-            console.log(res)
-            return new Promise((resolve, reject) => {
-                stripe.createPaymentMethod({
-                    type: 'card',
-                    card: cardElement
-                }).then(paymentMethod => {
-                    console.log(paymentMethod)
-                    const data = {
-                        clientSecret: res.data.client_secret,
-                        paymentMethodId: paymentMethod.paymentMethod.id
-                    }
-                    resolve(data)
-                }).catch(err => reject(err))
-            })
-        }).then(res => {
-            console.log(res)
-            return stripe.confirmCardPayment(res.clientSecret, {
-                payment_method: res.paymentMethodId
-            })
-        }).then(res => {
-            console.log(res)
-            handleClose()
-            setSnackSuccessOpen(true)
+    const cardElement = elements.getElement(CardElement);
 
-        }).catch(err => {
-            console.log(err)
-            setSnackFailedOpen(true)
-        })
+    try {
+      const res = await PaymentIntetnService.createPaymentIntent(cart, 'usd');
+      console.log(res.data);
+      const paymentMethod = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement
+      });
+
+      console.log(paymentMethod);
+
+      const data = {
+        clientSecret: res.data.client_secret,
+        paymentMethodId: paymentMethod.paymentMethod.id
+      };
+
+      console.log(data);
+
+      const confirmRes = await stripe.confirmCardPayment(data.clientSecret, {
+        payment_method: data.paymentMethodId
+      });
+
+      const confirmPayment = await PaymentIntetnService.confirmPayment(data.clientSecret);
+
+      console.log(confirmPayment, 'payment succeeded');
+      // handleClose();
+      // setSnackSuccessOpen(true);
+    } catch (err) {
+      console.error(err);
+      setSnackFailedOpen(true);
     }
+  };
 
-    return (
-        <form onSubmit={handleSubmit}>
-            <div style={{
-                boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
-                padding: "10px",
-                backgroundColor: '#F07F7F'
-            }}>
-                <CardElement options={{
-                    style: {
-                        base: {
-                            color: "white",
-                            "::placeholder": {
-                                color: 'white'
-                            }
-                        }
-                    }
-                }} />
-            </div>
+  return (
+    <form onSubmit={handleSubmit}>
+      <div style={{
+        boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
+        padding: "10px",
+        backgroundColor: '#F07F7F'
+      }}>
+        <CardElement options={{
+          style: {
+            base: {
+              color: "white",
+              "::placeholder": {
+                color: 'white'
+              }
+            }
+          }
+        }} />
+      </div>
 
-            <Button type="submit"
-                sx={{
-                    marginTop: '20px',
-                    width: '100%',
-                    backgroundColor: '#F07F7F',
-                    color: 'white',
-                    boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
-                }}
-                disabled={!stripe || !elements}>Pay</Button>
-        </form>
+      <Button type="submit"
+        sx={{
+          marginTop: '20px',
+          width: '100%',
+          backgroundColor: '#F07F7F',
+          color: 'white',
+          boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
+        }}
+        disabled={!stripe || !elements}>Pay</Button>
+    </form>
 
-    )
+  )
 }
 
 export default StripeCheckoutForm
